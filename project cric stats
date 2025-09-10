@@ -1,0 +1,184 @@
+create database cricket;
+use cricket;
+-- 1. Players
+CREATE TABLE Players (
+    player_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    country VARCHAR(50) NOT NULL,
+    role VARCHAR(20),
+    dob DATE
+);
+
+-- 2. Teams
+CREATE TABLE Teams (
+    team_id INT PRIMARY KEY AUTO_INCREMENT,
+    team_name VARCHAR(100) UNIQUE,
+    coach VARCHAR(100),
+    home_ground VARCHAR(100)
+);
+
+-- 3. Matches
+CREATE TABLE Matches (
+    match_id INT PRIMARY KEY AUTO_INCREMENT,
+    team1_id INT,
+    team2_id INT,
+    match_date DATE NOT NULL,
+    venue VARCHAR(100),
+    winner_team_id INT,
+    FOREIGN KEY (team1_id) REFERENCES Teams(team_id),
+    FOREIGN KEY (team2_id) REFERENCES Teams(team_id),
+    FOREIGN KEY (winner_team_id) REFERENCES Teams(team_id)
+);
+
+-- 4. Player Stats
+CREATE TABLE Player_Stats (
+    stat_id INT PRIMARY KEY AUTO_INCREMENT,
+    match_id INT,
+    player_id INT,
+    runs INT DEFAULT 0,
+    wickets INT DEFAULT 0,
+    catches INT DEFAULT 0,
+    FOREIGN KEY (match_id) REFERENCES Matches(match_id),
+    FOREIGN KEY (player_id) REFERENCES Players(player_id)
+);
+
+-- 5. Umpires
+CREATE TABLE Umpires (
+    umpire_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    country VARCHAR(50),
+    match_id INT,
+    FOREIGN KEY (match_id) REFERENCES Matches(match_id)
+);
+
+-- Insert Teams
+INSERT INTO Teams (team_name, coach, home_ground)
+VALUES 
+('india', 'Rahul Dravid', 'Wankhede Stadium'),
+('Australia', 'Andrew McDonald', 'MCG'),
+('England', 'Brendon McCullum', 'Lords'),
+('Pakistan', 'Gary Kirsten', 'Gaddafi Stadium');
+
+-- Insert Players
+INSERT INTO Players (name, country, role, dob)
+VALUES
+('Rohit Sharma', 'India', 'Batsman', '1987-04-30'),
+('Virat Kohli', 'India', 'Batsman', '1988-11-05'),
+('Jasprit Bumrah', 'India', 'Bowler', '1993-12-06'),
+('Steve Smith', 'Australia', 'Batsman', '1989-06-02'),
+('Pat Cummins', 'Australia', 'Bowler', '1993-05-08'),
+('Joe Root', 'England', 'Batsman', '1990-12-30'),
+('Babar Azam', 'Pakistan', 'Batsman', '1994-10-15');
+
+-- Insert Matches
+INSERT INTO Matches (team1_id, team2_id, match_date, venue, winner_team_id)
+VALUES
+(1, 2, '2024-06-10', 'Wankhede Stadium', 1),  -- India vs Australia
+(3, 4, '2024-06-15', 'Lords', 3),            -- England vs Pakistan
+(1, 3, '2024-06-20', 'Eden Gardens', 1);     -- India vs England
+
+-- Insert Player Stats
+INSERT INTO Player_Stats (match_id, player_id, runs, wickets, catches)
+VALUES
+(1, 1, 75, 0, 1),   -- Rohit Sharma
+(1, 2, 55, 0, 0),   -- Virat Kohli
+(1, 3, 10, 3, 0),   -- Bumrah
+(1, 4, 60, 0, 0),   -- Steve Smith
+(1, 5, 5, 2, 0),    -- Pat Cummins
+(2, 6, 100, 0, 1),  -- Joe Root
+(2, 7, 85, 0, 0),   -- Babar Azam
+(3, 1, 45, 0, 0),   -- Rohit Sharma
+(3, 2, 70, 0, 1),   -- Virat Kohli
+(3, 6, 40, 0, 0);   -- Joe Root
+
+-- Insert Umpires
+INSERT INTO Umpires (name, country, match_id)
+VALUES
+('Aleem Dar', 'Pakistan', 1),
+('Richard Illingworth', 'England', 1),
+('Kumar Dharmasena', 'Sri Lanka', 2),
+('Nitin Menon', 'India', 3);
+
+select * from teams;
+select * from umpires;
+select * from players;
+select * from matches;
+select * from player_stats;
+
+--index created for player names fast search:
+create INDEX idx_player_name on players(name);
+
+select * from players where name = 'Rohit sharma';
+
+create index idx_venue on matches(venue);
+select * from matches where venue = "wankhede stadium";
+
+---views:
+create view best_bowler as 
+select p.name,sum(s.wickets) as total_wickets  from players p join player_stats s on
+p. player_id=s.player_id  group by p.name order by total_wickets desc;
+
+select * from best_bowler limit 1;
+
+--triggers
+CREATE TRIGGER check_runs_before_insert
+BEFORE INSERT ON Player_Stats
+FOR EACH ROW
+BEGIN
+    IF NEW.runs < 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Runs cannot be negative!';
+    END IF;
+END
+
+---triggers created so when you put negative numbers in runs it gives a error message:
+
+
+---  windows function
+select player_id,match_id,runs,sum(runs)  over (partition by 
+plaYER_ID) as total_runs from player_stats;
+
+select match_id,player_id,runs,rank() over
+ (partition by match_id order by runs desc) as rank_in_match from 
+ player_stats;
+select match_id,player_id,runs,dense_rank() 
+over (partition by match_id order by runs desc) as rank_in_match
+ from player_stats;
+select match_id,player_id,runs,row_number() 
+over (partition by match_id order by runs desc) 
+as rank_in_match from player_stats;
+
+
+--stored procedures:
+
+CREATE PROCEDURE GetPlayerRuns(in p_id int)
+BEGIN
+    SELECT p.name, SUM(s.runs) AS total_runs
+    FROM Players p
+    JOIN Player_Stats s ON p.player_id = s.player_id
+    WHERE p.player_id = p_id
+    GROUP BY p.name;
+END 
+
+call getplayerruns(3);
+
+--functions
+
+CREATE FUNCTION BattingAverage(p_id INT)
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    DECLARE avg_runs DECIMAL(10,2);
+
+    SELECT AVG(runs) INTO avg_runs
+    FROM Player_Stats
+    WHERE player_id = p_id;
+
+    RETURN avg_runs;
+END
+
+select battingaverage(2);
+
+
+
+
