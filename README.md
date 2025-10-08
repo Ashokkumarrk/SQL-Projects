@@ -1,2 +1,2 @@
-# SQL Practices
-Daily SQL Practices
+# SQL Projects
+World cup stats 
